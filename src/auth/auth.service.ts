@@ -1,62 +1,31 @@
-import {
-  BadRequestException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { UsersService } from 'src/users/users.service';
 import { RegisterDto } from './dto/register.dto';
 
-import { JwtService } from '@nestjs/jwt';
-import * as bcryptjs from 'bcryptjs';
+import * as bcryptjs from 'bcryptjs'
 import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
-  ) {}
+    constructor(private readonly usersService: UsersService) { }
 
-  async register({ name, email, password }: RegisterDto) {
-    const user = await this.usersService.findOneByEmail(email);
-
-    if (user) {
-      throw new BadRequestException('User already exists');
+    async register({ name, email, password }: RegisterDto) {
+        const user = await this.usersService.findByEmail(email)
+        if (user) throw new BadRequestException("El email ya está egistrado")
+        return await this.usersService.create({
+            name,
+            email,
+            password: await bcryptjs.hash(password, 10)
+        })
     }
 
-    await this.usersService.create({
-      name,
-      email,
-      password: await bcryptjs.hash(password, 10),
-    });
+    async login({ email, password }: LoginDto) {
+        const user = await this.usersService.findByEmail(email)
+        if (!user) throw new UnauthorizedException("El email no esta registrado")
 
-    return {
-      name,
-      email,
-    };
-  }
-
-  async login({ email, password }: LoginDto) {
-    const user = await this.usersService.findByEmailWithPassword(email);
-    if (!user) {
-      throw new UnauthorizedException('email is wrong');
+        const isValidPassword = await bcryptjs.compare(password, user.password)
+        if (!isValidPassword) throw new UnauthorizedException("El password no es valido")
+            
+        return user
     }
-
-    const isPasswordValid = await bcryptjs.compare(password, user.password);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('password is wrong');
-    }
-
-    const payload = { email: user.email, role: user.role };
-    const token = await this.jwtService.signAsync(payload);
-
-    return {
-      token,
-      email,
-    };
-  }
-
-  async profile({ email, role }: { email: string; role: string }) {
-    return await this.usersService.findOneByEmail(email);
-  }
 }
