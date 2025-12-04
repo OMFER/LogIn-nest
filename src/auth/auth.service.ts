@@ -16,11 +16,12 @@ export class AuthService {
     async register({ name, email, password }: RegisterDto) {
         const user = await this.usersService.findByEmail(email)
         if (user) throw new BadRequestException("El email ya está egistrado")
-        return await this.usersService.create({
+        await this.usersService.create({
             name,
             email,
             password: await bcryptjs.hash(password, 10)
         })
+        return {name, email}
     }
 
     async login({ email, password }: LoginDto) {
@@ -35,5 +36,9 @@ export class AuthService {
             access_token: await this.jwtService.signAsync(payload),
             email,
         }
+    }
+
+    async profile({ email, role }: { email: string, role: string }) {
+        return await this.usersService.findByEmail(email)
     }
 }
